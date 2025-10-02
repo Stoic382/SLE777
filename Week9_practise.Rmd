@@ -1,0 +1,173 @@
+---
+title: "Week 9"
+author: "TJ"
+date: "2025-10-01"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Week 9 
+
+
+
+```{r loading packages}
+suppressPackageStartupMessages({
+  library("seqinr") # is a package designed to process and analyse sequence data.
+  library("R.utils") # general utilities like zip and unzip
+})
+```
+
+## 2. Loading E. coli sequence data
+
+We will be downloading E. coli genomic sequence data from Ensembl. Ensembl is one of the biggest databases of genomic data. There are many E. coli strains available in Ensembl, but we will focus today on “Escherichia coli str. K-12 substr. MG1655 str. K12 (GCA_000005845)”
+
+```{r downloading E.coli Genome}
+library("R.utils")
+
+URL="http://ftp.ensemblgenomes.org/pub/bacteria/release-53/fasta/bacteria_0_collection/escherichia_coli_str_k_12_substr_mg1655_gca_000005845/cds/Escherichia_coli_str_k_12_substr_mg1655_gca_000005845.ASM584v2.cds.all.fa.gz"
+download.file(URL,destfile="ecoli_cds.fa.gz")
+gunzip("ecoli_cds.fa.gz")
+```
+
+
+```{r downloading E.coli Genome}
+list.files()
+```
+
+
+```{r downloading E.coli Genome2}
+plot(pressure)
+```
+
+Load the seqinr library: This library provides tools for biological sequence retrieval and analysis.
+```{r}
+library("seqinr")
+```
+
+#Reading the fasta file 
+make something here that makes sense 
+```{r}
+cds <- seqinr::read.fasta("ecoli_cds.fa")
+str(head(cds))
+```
+## Basic sequence analysis 
+```{r}
+length(cds)
+```
+## Summary command 
+```{r}
+head(summary(cds))
+```
+Now let's determine the total length of our sequence. The code below extracts the lengths of genes from the cds object by converting the first column of the summary to numeric values. It then calculates the total length of all genes by summing these values.
+```{r}
+len <- as.numeric(summary(cds)[,1])
+
+sum(len)
+```
+We can look at the distribution of coding sequence length with different types of plots.
+```{r}
+hist(len, ,xlab="sequence length (bp)",ylab="frequency",main="histogram of coding sequence length")
+```
+## Sequence composition
+First with one sequence, then with the whole set of coding sequences.
+
+use ?GC ?count and ?summary to see the documentation for those seqinr commands.
+
+cds is a list containing multiple sequences. To access a specific element within a list, such as the first sequence, we use double square brackets ([[ ]]). This syntax retrieves the actual sequence object from the list. For example, cds[[1]] extracts the first sequence from the cds list. We can then pass this to the GC function to compute its GC content.
+```{r}
+GC(cds[[1]])
+```
+Let's count the number of each nucleotide present in this gene.
+```{r}
+count(cds[[2]],4)
+```
+## If you want to count the total length or compute the GC content of a specific number of genes from a list, you will need to unlist them first. For instance, length(unlist(cds[1:3])) extracts the first three sequences from the cds list, converts them into a single character vector using unlist, and then calculates the total length of this combined vector.
+```{r}
+length(unlist(cds))
+GC(unlist(cds))
+```
+DNA compostion of whole genome 
+```{r}
+dna <- unlist(cds)
+dna_composition <- count(dna,1)
+barplot(dna_composition,xlab="nucleotides",ylab="frequency", main="E coli CDS composition")
+```
+##If we want to calculate the relative frequencies of each nucleotide in a DNA sequence, we first count the number of each nucleotide using dna_composition <- count(dna, 1). To find the relative frequencies, we divide each nucleotide count by the total number of nucleotides using dna_composition / sum(dna_composition). This step transforms the raw counts into proportions, showing the frequency of each nucleotide as a fraction of the total, which helps in understanding the distribution of nucleotides within the sequence.
+```{r}
+dna_composition/sum(dna_composition)
+```
+##We can also plot of our nucleotide frequencies by using the following code
+```{r}
+dna_proportion <- dna_composition / sum(dna_composition)
+barplot(dna_proportion,xlab="nucleotides",ylab="proportion", main="E coli CDS composition")
+
+grid()
+```
+##First, we need to translate the sequences. For example, the code below will translate your first CDS
+```{r}
+translate(cds[[1]])
+```
+Although we have not learned loops in R, we will have to use a for loop if we want to translate all the cds sequences in our genome. The good news is that for loops work almost similar to what we learned in bash.
+
+##Translate the entire genome 
+```{r}
+prot <- lapply(cds, translate)
+```
+finding uniqe amino acids in gene 2
+```{r}
+
+aa <- unique(prot[[2]])
+aa <- aa[aa != "*"]
+length(aa)
+```
+## Let's determine the frequency of each amino acid in our first gene. This code counts the occurrences of each amino acid in the first sequence of the prot list, using aa as the set of possible amino acids. 
+```{r}
+count(prot[[2]],wordsize=1,alphabet=aa)
+```
+##Codon usage 
+A codon is a three base triplet that codes for a particular amino acid. As there are 64 possible codons and just 20 amino acids (and 3 termination codons), some amino acids are coded by multiple codons. For example, leucine is coded by six codons.
+
+seqinr has a command called uco which calculates some codon usage information.
+
+Let’s have a look at how it can calculate codon usage for a single protein sequence.
+```{r}
+uco(cds[[2]])
+```
+##What if you wanted to calculate synonymous codons? The code below computes the Relative Synonymous Codon Usage (RSCU) values for the codons in the second sequence 
+```{r}
+uco(cds[[2]],index="rscu")
+```
+```{r}
+uco(cds[[2]],index="rscu",as.data.frame=TRUE)
+```
+##K-mer profiling
+K-mer is simply a short sequence string of length k. We can use k-mer analysis to identify particular sequences that are over- or under-represented in an organism.
+```{r}
+prots <- unlist(prot)
+
+mycounts <- count(prots,wordsize=3,alphabet=aa)
+
+str(mycounts)
+```
+```{r}
+head(mycounts)
+```
+```{r}
+myfreq <- count(prots,wordsize=3,alphabet=aa,freq=TRUE)
+```
+```{r}
+head(mycounts)
+```
+```{r}
+myfreq <- count(prots,wordsize=3,alphabet=aa,freq=TRUE)
+```
+```{r}
+head(myfreq)
+
+```
+
